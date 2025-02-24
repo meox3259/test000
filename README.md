@@ -1,0 +1,1 @@
+detect marcrosatellite test code
