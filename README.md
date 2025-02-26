@@ -1,1 +1,7 @@
-detect marcrosatellite test code
+Detect marcrosatellite test code
+
+```bash
+mkdir build && cd build
+cmake ..
+make
+```

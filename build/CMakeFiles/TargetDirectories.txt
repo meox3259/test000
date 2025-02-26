@@ -1,6 +1,0 @@
-/home/hasee/bio/code/suffix/build/CMakeFiles/suffix.dir
-/home/hasee/bio/code/suffix/build/CMakeFiles/edit_cache.dir
-/home/hasee/bio/code/suffix/build/CMakeFiles/rebuild_cache.dir
-/home/hasee/bio/code/suffix/build/src/spoa/CMakeFiles/spoa.dir
-/home/hasee/bio/code/suffix/build/src/spoa/CMakeFiles/edit_cache.dir
-/home/hasee/bio/code/suffix/build/src/spoa/CMakeFiles/rebuild_cache.dir
