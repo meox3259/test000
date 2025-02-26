@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/Myproject.dir/main.cc.o CMakeFiles/Myproject.dir/sam.cc.o CMakeFiles/Myproject.dir/handle_file.cc.o CMakeFiles/Myproject.dir/sequence_handler.cc.o CMakeFiles/Myproject.dir/utils.cc.o -o Myproject 

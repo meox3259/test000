@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/suffix.dir/src/handle_file.cc.o CMakeFiles/suffix.dir/src/ksw2/ksw2_extz2_sse.c.o CMakeFiles/suffix.dir/src/ksw2/ksw2_gg2_sse.c.o CMakeFiles/suffix.dir/src/main.cc.o CMakeFiles/suffix.dir/src/sam.cc.o CMakeFiles/suffix.dir/src/sequence_handler.cc.o CMakeFiles/suffix.dir/src/utils.cc.o -o bin/suffix  src/spoa/lib/libspoa.a 

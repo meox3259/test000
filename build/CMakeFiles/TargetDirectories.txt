@@ -1,3 +1,6 @@
-/home/meox3259/code/suffix/build/CMakeFiles/Myproject.dir
-/home/meox3259/code/suffix/build/CMakeFiles/edit_cache.dir
-/home/meox3259/code/suffix/build/CMakeFiles/rebuild_cache.dir
+/home/hasee/bio/code/suffix/build/CMakeFiles/suffix.dir
+/home/hasee/bio/code/suffix/build/CMakeFiles/edit_cache.dir
+/home/hasee/bio/code/suffix/build/CMakeFiles/rebuild_cache.dir
+/home/hasee/bio/code/suffix/build/src/spoa/CMakeFiles/spoa.dir
+/home/hasee/bio/code/suffix/build/src/spoa/CMakeFiles/edit_cache.dir
+/home/hasee/bio/code/suffix/build/src/spoa/CMakeFiles/rebuild_cache.dir
