@@ -1,7 +1,5 @@
 Detect marcrosatellite test code
 
 ```bash
-mkdir build && cd build
-cmake ..
-make
+mkdir build && cd build && cmake .. && make && cd ..
 ```
