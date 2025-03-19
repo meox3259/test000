@@ -16,6 +16,12 @@ int match = 1, mis = 2, gap_open = 2, gap_ext = 1;
 int8_t mat[25] = {1,  -2, -2, -2, 0,  -2, 1, -2, -2, 0, -2, -2, 1,
                   -2, 0,  -2, -2, -2, 1,  0, 0,  0,  0, 0,  0};
 
+namespace factor {
+
+int lower_bound = 1000, upper_bound = 3000;
+
+bool is_gap_valid(int gap) { return gap >= lower_bound && gap <= upper_bound; }
+
 bool calculate_sparsity(const std::vector<int> &index, int gap_threshold,
                         double gap_ratio) {
   if (!std::is_sorted(index.begin(), index.end())) {
@@ -26,14 +32,23 @@ bool calculate_sparsity(const std::vector<int> &index, int gap_threshold,
   int tot = 0;
   for (int i = 0; i < static_cast<int>(index.size()) - 1; ++i) {
     int gap = index[i + 1] - index[i];
-    if (gap <= gap_threshold) {
-      tot++;
+    if (!(gap >= lower_bound && gap <= upper_bound)) {
+      return false;
     }
   }
+}
 
-  int tot_gap = static_cast<int>(index.size()) - 1;
-
-  return static_cast<double>(tot) / static_cast<double>(tot_gap) >= gap_ratio;
+std::vector<int> get_suspect_region(const std::vector<int> &index) {
+  int len = index.size();
+  for (int i = 0; i < len; ++i) {
+    std::vector<int> gap_size;
+    for (int j = 1; j < 10; ++j) {
+      gap_size.push_back(index[i + j] - index[i + j - 1]);
+    }
+    for (int gap : gap_size) {
+      if
+    }
+  }
 }
 
 bool get_overlap(const std::vector<int> &l, const std::vector<int> &r,
@@ -53,6 +68,18 @@ bool get_overlap(const std::vector<int> &l, const std::vector<int> &r,
   return overlap_l >= overlap_threshold && overlap_r >= overlap_threshold;
 }
 
+} // namespace factor
+
+void parse_index_set(const std::vector<int> &index) {
+  int len = index.size();
+  for (int i = 0; i < len; ++i) {
+    std::vector<int> gap_size;
+    for (int j = 1; j < 10; ++j) {
+      gap_size.push_back(index[i + j] - index[i + j - 1]);
+    }
+  }
+}
+
 void solve(uint8_t *s, int len, const Param &opt) {
   std::string sequence("");
   for (int i = 0; i < len; ++i) {
@@ -64,6 +91,12 @@ void solve(uint8_t *s, int len, const Param &opt) {
 
   std::cerr << "start sam calc" << std::endl;
   std::vector<std::vector<int>> index_set;
+  for (int i = 0; i < sam->size(); ++i) {
+    auto right_index_set = sam->get_right_index_by_node(i);
+    if (right_index_set.size() < 4) {
+      continue;
+    }
+  }
   for (int i = 0; i < sam->size(); ++i) {
     auto right_index_i = sam->get_right_index_by_node(i);
     if (right_index_i.size() < 4) {
@@ -92,6 +125,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
 
   std::cerr << "set size = " << index_set.size() << std::endl;
   std::cerr << "start overlap" << std::endl;
+  for (int i = 0; i < index_set.size(); ++i) {
+  }
   while (true) {
     int sz = index_set.size();
     int merge_count = 0;
@@ -110,9 +145,14 @@ void solve(uint8_t *s, int len, const Param &opt) {
         new_index_set.emplace_back(index_set[i]);
       }
     }
+    swap(index_set, new_index_set);
   }
 
   std::cerr << "size = " << index_set.size() << std::endl;
+  for (const auto &vec : index_set) {
+    std::cerr << "l = " << vec[0] << " " << "r = " << vec.back() << " "
+              << "size = " << vec.size() << std::endl;
+  }
   auto alignment_engine = spoa::AlignmentEngine::Create(
       spoa::AlignmentType::kNW, 3, -5, -3); // linear gaps
   spoa::Graph graph{};
@@ -129,6 +169,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
         sequence += safeNumberToDnaChar(s[j]);
       }
       strings.emplace_back(std::move(sequence));
+      std::cerr << "vec[i] = " << vec[i] << " vec[i + 1] = " << vec[i + 1];
+      std::cerr << " i = " << i << " sequence = " << sequence << std::endl;
     }
 
     for (auto &sequence : strings) {
@@ -157,7 +199,5 @@ void solve(uint8_t *s, int len, const Param &opt) {
     *n_cigar = ez.n_cigar;
     uint32_t **cigar;
     *cigar = ez.cigar;
-
-    int n_seqs;
   }
 }
