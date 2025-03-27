@@ -75,7 +75,7 @@ void SuffixAutomation::get_right_index(int bound) {
   }
 
   auto dfs = [&adj, bound, this](auto &&dfs, int x) -> void {
-    if (judge_len_range(x, 100)) {
+    if (judge_len_range(x, 30)) {
       std::queue<int> q;
       q.push(x);
       while (!q.empty()) {

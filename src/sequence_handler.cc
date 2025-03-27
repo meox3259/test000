@@ -25,7 +25,7 @@ int8_t mat[25] = {1,  -2, -2, -2, 0,  -2, 1, -2, -2, 0, -2, -2, 1,
 namespace factor {
 
 const double error_rate = 0.01;
-const int lower_bound = 1000, upper_bound = 3000;
+const int lower_bound = 1000, upper_bound = 5000;
 const int gap_delta_threshold = 50;
 
 const int min_anchor_size = 5, max_anchor_size = 20;
@@ -52,8 +52,13 @@ bool check_gap_set_is_valid(const std::vector<int> &index) {
   std::vector<int> gap_set;
   for (int i = 0; i < static_cast<int>(index.size()) - 1; ++i) {
     gap_set.push_back(index[i + 1] - index[i]);
+    //  std::cerr << index[i + 1] - index[i] << ' ';
   }
+  // std::cerr << std::endl;
   int len = gap_set.size();
+  if (len < 1) {
+    return false;
+  }
   int avg = accumulate(gap_set.begin(), gap_set.end(), 0) / len;
   if (!is_gap_valid(avg)) {
     return false;
@@ -67,15 +72,19 @@ bool check_gap_set_is_valid(const std::vector<int> &index) {
 }
 
 std::vector<std::pair<int, std::vector<int>>>
-collect_suspect_region(const std::vector<int> &index) {
+collect_suspect_region(std::vector<int> &index) {
+  std::sort(index.begin(), index.end());
   std::vector<std::pair<int, std::vector<int>>> suspect_region;
   int len = index.size();
   for (int i = 0; i < len; ++i) {
-    for (int j = max_anchor_size; j >= min_anchor_size; --j) {
+    for (int j = std::min(max_anchor_size, len);
+         j >= min_anchor_size && i + j - 1 < index.size(); --j) {
       std::vector<int> anchor_index;
-      for (int k = 0; k <= j; ++k) {
+      for (int k = 0; k < j; ++k) {
         anchor_index.push_back(index[i + k]);
+        //  std::cerr << index[i + k] << ' ';
       }
+      // std::cerr << std::endl;
       if (check_gap_set_is_valid(anchor_index)) {
         suspect_region.emplace_back((index[i + j] - index[i]) / (j - 1),
                                     std::move(anchor_index));
@@ -84,23 +93,6 @@ collect_suspect_region(const std::vector<int> &index) {
     }
   }
   return suspect_region;
-}
-
-bool get_overlap(const std::vector<int> &l, const std::vector<int> &r,
-                 double overlap_threshold) {
-  if (l.empty() || r.empty()) {
-    std::cerr << "Error: l or r is empty" << std::endl;
-    return false;
-  }
-  int l0 = l[0], l1 = l.back(), r0 = r[0], r1 = r.back();
-  int l_cross = std::upper_bound(r.begin(), r.end(), l1) -
-                std::lower_bound(r.begin(), r.end(), l0);
-  int r_cross = std::upper_bound(l.begin(), l.end(), r1) -
-                std::lower_bound(l.begin(), l.end(), r0);
-  int l_size = l.size(), r_size = r.size();
-  double overlap_l = (double)l_cross / (double)(l_size);
-  double overlap_r = (double)r_cross / (double)(r_size);
-  return overlap_l >= overlap_threshold && overlap_r >= overlap_threshold;
 }
 
 std::vector<int> deal_with_gap_values(std::vector<int> &gap_values) {
@@ -175,7 +167,6 @@ std::pair<int, int> alignment(uint8_t *query, int qlen, uint8_t *target,
   uint32_t **cigar;
   *cigar = ez.cigar;
   std::vector<int> xid = ksw2_get_xid(*cigar, *n_cigar, query, target);
-  free(cigar);
   return {xid[0], accumulate(xid.begin(), xid.end(), 0)};
 }
 
@@ -199,7 +190,6 @@ std::pair<int, int> alignment(const std::string &query_string,
   std::vector<int> xid = ksw2_get_xid(cigar, *n_cigar, query, target);
   free(query);
   free(target);
-  free(cigar);
   return {xid[0], accumulate(xid.begin(), xid.end(), 0)};
 }
 
@@ -327,11 +317,19 @@ void solve(uint8_t *s, int len, const Param &opt) {
       continue;
     }
     auto current_suspect_region = factor::collect_suspect_region(right_index_i);
+    if (current_suspect_region.size() > 0) {
+      std::cerr << "current_suspect_region.size() = "
+                << current_suspect_region.size() << std::endl;
+    }
     for (const auto &[gap, anchor_index] : current_suspect_region) {
       suspect_region.emplace_back(gap, std::move(anchor_index));
       gap_values.push_back(gap);
     }
   }
+
+  std::cerr << "gap_values.size() = " << gap_values.size() << std::endl;
+
+  std::cerr << "eeeeeeeee" << std::endl;
 
   std::vector<std::vector<std::vector<int>>> bucket_of_index_partition(
       gap_values.size());
@@ -364,6 +362,9 @@ void solve(uint8_t *s, int len, const Param &opt) {
       }
     }
   }
+
+  std::cerr << "bucket_of_index_partition.size() = "
+            << bucket_of_index_partition.size() << std::endl;
 
   for (auto &vec : bucket_of_index) {
     std::sort(vec.begin(), vec.end(),
@@ -424,6 +425,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
     return false;
   };
 
+  std::cerr << "114514111111" << std::endl;
+
   std::vector<std::tuple<int, int, int>> raw_estimate_interval;
   for (const auto &[start_position, unit_size] : raw_estimate_unit_region) {
     int end_position = start_position + unit_size;
@@ -438,6 +441,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
         // 做一下alignment，如果相似度太小就break
         auto [match, length] = alignment::alignment(
             s + i - unit_size, unit_size, s + start_position, unit_size);
+        std::cerr << "length = " << length << " " << "match = " << match
+                  << std::endl;
         if (1. - ((double)(match) / (double)(length)) <= factor::error_rate) {
           break;
         }
