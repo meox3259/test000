@@ -162,11 +162,7 @@ std::pair<int, int> alignment(uint8_t *query, int qlen, uint8_t *target,
 
   ksw_extz2_sse(0, qlen, query, tlen, target, 5, mat, gap_open, gap_ext, w,
                 zdrop, end_bonus, flag, &ez);
-  int *n_cigar;
-  *n_cigar = ez.n_cigar;
-  uint32_t **cigar;
-  *cigar = ez.cigar;
-  std::vector<int> xid = ksw2_get_xid(*cigar, *n_cigar, query, target);
+  std::vector<int> xid = ksw2_get_xid(ez.cigar, ez.n_cigar, query, target);
   return {xid[0], accumulate(xid.begin(), xid.end(), 0)};
 }
 
@@ -182,14 +178,10 @@ std::pair<int, int> alignment(const std::string &query_string,
   int tlen = static_cast<int>(target_string.size());
   ksw_extz2_sse(0, qlen, query, tlen, target, 5, mat, gap_open, gap_ext, w,
                 zdrop, end_bonus, flag, &ez);
-  int *n_cigar;
-  *n_cigar = ez.n_cigar;
-  uint32_t *cigar;
-  cigar = ez.cigar;
 
-  std::vector<int> xid = ksw2_get_xid(cigar, *n_cigar, query, target);
-  free(query);
-  free(target);
+  std::vector<int> xid = ksw2_get_xid(ez.cigar, ez.n_cigar, query, target);
+  delete[] query;
+  delete[] target;
   return {xid[0], accumulate(xid.begin(), xid.end(), 0)};
 }
 
@@ -262,12 +254,8 @@ int extend_left_boundary(uint8_t *query, int qlen, uint8_t *target, int tlen) {
 
   ksw_extz2_sse(0, qlen, query, tlen, target, 5, mat, gap_open, gap_ext, w,
                 zdrop, end_bonus, flag, &ez);
-  int *n_cigar;
-  *n_cigar = ez.n_cigar;
-  uint32_t *cigar;
-  cigar = ez.cigar;
-  std::vector<int> xid = ksw2_get_xid(cigar, *n_cigar, query, target);
-  return ksw2_backtrack_left_end(*n_cigar, cigar, qlen, tlen, xid[0]);
+  std::vector<int> xid = ksw2_get_xid(ez.cigar, ez.n_cigar, query, target);
+  return ksw2_backtrack_left_end(ez.n_cigar, ez.cigar, qlen, tlen, xid[0]);
 }
 
 int extend_right_boundary(uint8_t *query, int qlen, uint8_t *target, int tlen) {
@@ -277,33 +265,21 @@ int extend_right_boundary(uint8_t *query, int qlen, uint8_t *target, int tlen) {
 
   ksw_extz2_sse(0, qlen, query, tlen, target, 5, mat, gap_open, gap_ext, w,
                 zdrop, end_bonus, flag, &ez);
-  int *n_cigar;
-  *n_cigar = ez.n_cigar;
-  uint32_t *cigar;
-  cigar = ez.cigar;
-  std::vector<int> xid = ksw2_get_xid(cigar, *n_cigar, query, target);
-  return ksw2_backtrack_right_end(*n_cigar, cigar, qlen, tlen, xid[0]);
+  std::vector<int> xid = ksw2_get_xid(ez.cigar, ez.n_cigar, query, target);
+  return ksw2_backtrack_right_end(ez.n_cigar, ez.cigar, qlen, tlen, xid[0]);
 }
 
 } // namespace alignment
-
-void parse_index_set(const std::vector<int> &index) {
-  int len = index.size();
-  for (int i = 0; i < len; ++i) {
-    std::vector<int> gap_size;
-    for (int j = 1; j < 10; ++j) {
-      gap_size.push_back(index[i + j] - index[i + j - 1]);
-    }
-  }
-}
 
 void solve(uint8_t *s, int len, const Param &opt) {
   std::string sequence("");
   for (int i = 0; i < len; ++i) {
     sequence += safeNumberToDnaChar(s[i]);
   }
+  std::cerr << "sequence.size() = " << sequence.size() << std::endl;
   std::shared_ptr<SuffixAutomation> sam =
       std::make_shared<SuffixAutomation>(sequence);
+  std::cerr << "sequence.size111() = " << sequence.size() << std::endl;
   sam->get_right_index(opt.lower_bound_size);
 
   std::cerr << "start sam calc" << std::endl;
@@ -411,7 +387,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
   auto already_covered = [&max_l_boundary, &max_r_boundary](int start_position,
                                                             int end_position,
                                                             int unit_size) {
-    if (end_position <= max_r_boundary && start_position >= max_l_boundary) {
+    if (end_position <= max_r_boundary + unit_size &&
+        start_position >= max_l_boundary) {
       if (end_position > max_r_boundary) {
         max_r_boundary = end_position;
         max_l_boundary = start_position;
@@ -426,6 +403,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
   };
 
   std::cerr << "114514111111" << std::endl;
+  std::cerr << "raw_estimate_unit_region.size() = "
+            << raw_estimate_unit_region.size() << std::endl;
 
   std::vector<std::tuple<int, int, int>> raw_estimate_interval;
   for (const auto &[start_position, unit_size] : raw_estimate_unit_region) {
@@ -440,9 +419,7 @@ void solve(uint8_t *s, int len, const Param &opt) {
       for (int i = start_position; i >= unit_size; i -= unit_size) {
         // 做一下alignment，如果相似度太小就break
         auto [match, length] = alignment::alignment(
-            s + i - unit_size, unit_size, s + start_position, unit_size);
-        std::cerr << "length = " << length << " " << "match = " << match
-                  << std::endl;
+            s + i - unit_size, unit_size, s + i, unit_size);
         if (1. - ((double)(match) / (double)(length)) <= factor::error_rate) {
           break;
         }
@@ -454,7 +431,9 @@ void solve(uint8_t *s, int len, const Param &opt) {
       for (int i = end_position; i + unit_size <= len; i += unit_size) {
         // 做一下alignment，如果相似度太小就break
         auto [match, length] = alignment::alignment(
-            s + i, unit_size, s + start_position, unit_size);
+            s + i, unit_size, s + i - unit_size, unit_size);
+        std::cerr << "match = " << match << " " << "length = " << length
+                  << std::endl;
         if (1. - ((double)match / (double)(length)) <= factor::error_rate) {
           break;
         }
@@ -468,7 +447,12 @@ void solve(uint8_t *s, int len, const Param &opt) {
     }
     raw_estimate_interval.emplace_back(unit_size, raw_left_boundary,
                                        raw_right_boundary);
+    std::cerr << "unit_size = " << unit_size << " "
+              << "left_boundary = " << raw_left_boundary << " "
+              << "right_boundary = " << raw_right_boundary << std::endl;
   }
+
+  // std::cerr << "555" << std::endl;
 
   auto alignment_engine = spoa::AlignmentEngine::Create(
       spoa::AlignmentType::kNW, 3, -5, -3); // linear gaps
@@ -476,8 +460,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
 
   for (auto [unit_size, left_boundary, right_boundary] :
        raw_estimate_interval) {
-    std::cerr << "l = " << left_boundary << " " << "r = " << right_boundary
-              << " " << "size = " << unit_size << std::endl;
+    //  std::cerr << "l = " << left_boundary << " " << "r = " << right_boundary
+    //          << " " << "size = " << unit_size << std::endl;
     int seg_count =
         (right_boundary - left_boundary + unit_size - 1) / unit_size;
 
@@ -491,13 +475,18 @@ void solve(uint8_t *s, int len, const Param &opt) {
       strings.emplace_back(std::move(sequence));
     }
 
+    std::cerr << "000" << std::endl;
     for (auto &sequence : strings) {
       auto alignment = alignment_engine->Align(sequence, graph);
       graph.AddAlignment(alignment, sequence);
     }
 
+    std::cerr << "111" << std::endl;
+
     auto consensus = graph.GenerateConsensus();
     int consensus_len = static_cast<int>(consensus.size());
+
+    std::cerr << "222" << std::endl;
 
     uint8_t *cons = alloc_uint8_t(consensus);
     // 向左拓展边界
@@ -505,22 +494,28 @@ void solve(uint8_t *s, int len, const Param &opt) {
         s + std::max(0, left_boundary - unit_size),
         std::min(unit_size, left_boundary), cons, consensus_len);
 
+    std::cerr << "333" << std::endl;
+
     // 向右拓展边界
     int right_ext = alignment::extend_right_boundary(
         s + std::min(len, right_boundary + unit_size),
         std::min(unit_size, len - right_boundary), cons, consensus_len);
+
+    std::cerr << "444" << std::endl;
     left_boundary -= left_ext;
     right_boundary += right_ext;
     double all_match = 0;
     double all_total = 0;
     for (int i = left_boundary; i < right_boundary; i += unit_size) {
-      auto [match, total] =
-          alignment::alignment(s + i, unit_size, cons, consensus_len);
+      auto [match, total] = alignment::alignment(
+          s + i, std::min(unit_size, right_boundary - i), cons, consensus_len);
+      std::cerr << "match = " << match << " " << "total = " << total
+                << std::endl;
       all_match += match;
       all_total += total;
     }
     std::cout << "[" << left_boundary << "," << right_boundary << "]" << " "
               << all_match / all_total << ' ' << consensus << std::endl;
-    free(cons);
+    delete[] cons;
   }
 }

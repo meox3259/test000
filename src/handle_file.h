@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define MAX_READ_LEN 10000000
+#define MAX_READ_LEN 1000000000
 #define MAX_ID_LEN 1000
 #define BLK 4096
 
