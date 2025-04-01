@@ -3,6 +3,7 @@
 #include "sam.h"
 #include "utils.h"
 
+#include <cassert>
 #include <queue>
 
 SuffixAutomation::SuffixAutomation(const std::string &s) {
@@ -105,8 +106,10 @@ void SuffixAutomation::get_right_index(int bound) {
 int SuffixAutomation::size() { return sz; }
 
 bool SuffixAutomation::judge_len_range(int x, int bound) {
+  if (link[x] < 0) {
+    return 0 >= bound;
+  }
   return len[link[x]] + 1 >= bound;
-  //  return len[link[x]] + 1 <= bound && bound <= len[x];
 }
 
 std::vector<int> SuffixAutomation::get_right_index_by_node(int x) {

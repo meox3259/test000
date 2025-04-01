@@ -11,6 +11,7 @@
 #include <cinttypes>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <memory>
 #include <numeric>
 #include <string_view>
@@ -31,22 +32,6 @@ const int gap_delta_threshold = 50;
 const int min_anchor_size = 5, max_anchor_size = 20;
 
 bool is_gap_valid(int gap) { return gap >= lower_bound && gap <= upper_bound; }
-
-bool calculate_sparsity(const std::vector<int> &index, int gap_threshold,
-                        double gap_ratio) {
-  if (!std::is_sorted(index.begin(), index.end())) {
-    std::cerr << "Error: index is not sorted" << std::endl;
-    return false;
-  }
-
-  int tot = 0;
-  for (int i = 0; i < static_cast<int>(index.size()) - 1; ++i) {
-    int gap = index[i + 1] - index[i];
-    if (!(gap >= lower_bound && gap <= upper_bound)) {
-      return false;
-    }
-  }
-}
 
 bool check_gap_set_is_valid(const std::vector<int> &index) {
   std::vector<int> gap_set;
@@ -82,9 +67,7 @@ collect_suspect_region(std::vector<int> &index) {
       std::vector<int> anchor_index;
       for (int k = 0; k < j; ++k) {
         anchor_index.push_back(index[i + k]);
-        //  std::cerr << index[i + k] << ' ';
       }
-      // std::cerr << std::endl;
       if (check_gap_set_is_valid(anchor_index)) {
         suspect_region.emplace_back((index[i + j] - index[i]) / (j - 1),
                                     std::move(anchor_index));
@@ -271,18 +254,15 @@ int extend_right_boundary(uint8_t *query, int qlen, uint8_t *target, int tlen) {
 
 } // namespace alignment
 
-void solve(uint8_t *s, int len, const Param &opt) {
+void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
   std::string sequence("");
   for (int i = 0; i < len; ++i) {
     sequence += safeNumberToDnaChar(s[i]);
   }
-  std::cerr << "sequence.size() = " << sequence.size() << std::endl;
   std::shared_ptr<SuffixAutomation> sam =
       std::make_shared<SuffixAutomation>(sequence);
-  std::cerr << "sequence.size111() = " << sequence.size() << std::endl;
   sam->get_right_index(opt.lower_bound_size);
 
-  std::cerr << "start sam calc" << std::endl;
   std::vector<std::vector<int>> index_set;
 
   std::vector<std::pair<int, std::vector<int>>> suspect_region;
@@ -293,19 +273,11 @@ void solve(uint8_t *s, int len, const Param &opt) {
       continue;
     }
     auto current_suspect_region = factor::collect_suspect_region(right_index_i);
-    if (current_suspect_region.size() > 0) {
-      std::cerr << "current_suspect_region.size() = "
-                << current_suspect_region.size() << std::endl;
-    }
     for (const auto &[gap, anchor_index] : current_suspect_region) {
       suspect_region.emplace_back(gap, std::move(anchor_index));
       gap_values.push_back(gap);
     }
   }
-
-  std::cerr << "gap_values.size() = " << gap_values.size() << std::endl;
-
-  std::cerr << "eeeeeeeee" << std::endl;
 
   std::vector<std::vector<std::vector<int>>> bucket_of_index_partition(
       gap_values.size());
@@ -338,9 +310,6 @@ void solve(uint8_t *s, int len, const Param &opt) {
       }
     }
   }
-
-  std::cerr << "bucket_of_index_partition.size() = "
-            << bucket_of_index_partition.size() << std::endl;
 
   for (auto &vec : bucket_of_index) {
     std::sort(vec.begin(), vec.end(),
@@ -402,10 +371,6 @@ void solve(uint8_t *s, int len, const Param &opt) {
     return false;
   };
 
-  std::cerr << "114514111111" << std::endl;
-  std::cerr << "raw_estimate_unit_region.size() = "
-            << raw_estimate_unit_region.size() << std::endl;
-
   std::vector<std::tuple<int, int, int>> raw_estimate_interval;
   for (const auto &[start_position, unit_size] : raw_estimate_unit_region) {
     int end_position = start_position + unit_size;
@@ -432,8 +397,8 @@ void solve(uint8_t *s, int len, const Param &opt) {
         // 做一下alignment，如果相似度太小就break
         auto [match, length] = alignment::alignment(
             s + i, unit_size, s + i - unit_size, unit_size);
-        std::cerr << "match = " << match << " " << "length = " << length
-                  << std::endl;
+        //  std::cerr << "match = " << match << " " << "length = " << length
+        //            << std::endl;
         if (1. - ((double)match / (double)(length)) <= factor::error_rate) {
           break;
         }
@@ -447,21 +412,16 @@ void solve(uint8_t *s, int len, const Param &opt) {
     }
     raw_estimate_interval.emplace_back(unit_size, raw_left_boundary,
                                        raw_right_boundary);
-    std::cerr << "unit_size = " << unit_size << " "
-              << "left_boundary = " << raw_left_boundary << " "
-              << "right_boundary = " << raw_right_boundary << std::endl;
   }
-
-  // std::cerr << "555" << std::endl;
 
   auto alignment_engine = spoa::AlignmentEngine::Create(
       spoa::AlignmentType::kNW, 3, -5, -3); // linear gaps
   spoa::Graph graph{};
 
+  ofs << "fasta:" << std::endl;
+
   for (auto [unit_size, left_boundary, right_boundary] :
        raw_estimate_interval) {
-    //  std::cerr << "l = " << left_boundary << " " << "r = " << right_boundary
-    //          << " " << "size = " << unit_size << std::endl;
     int seg_count =
         (right_boundary - left_boundary + unit_size - 1) / unit_size;
 
@@ -475,47 +435,53 @@ void solve(uint8_t *s, int len, const Param &opt) {
       strings.emplace_back(std::move(sequence));
     }
 
-    std::cerr << "000" << std::endl;
     for (auto &sequence : strings) {
       auto alignment = alignment_engine->Align(sequence, graph);
       graph.AddAlignment(alignment, sequence);
     }
 
-    std::cerr << "111" << std::endl;
-
     auto consensus = graph.GenerateConsensus();
     int consensus_len = static_cast<int>(consensus.size());
 
-    std::cerr << "222" << std::endl;
-
     uint8_t *cons = alloc_uint8_t(consensus);
-    // 向左拓展边界
-    int left_ext = alignment::extend_left_boundary(
-        s + std::max(0, left_boundary - unit_size),
-        std::min(unit_size, left_boundary), cons, consensus_len);
 
-    std::cerr << "333" << std::endl;
+    // 向左拓展边界，这里需要把序列倒过来然后匹配
+    std::string reverse_sequence("");
+    for (int i = 0; i < std::min(unit_size, left_boundary); ++i) {
+      reverse_sequence += safeNumberToDnaChar(s[left_boundary - i]);
+    }
+
+    std::reverse(consensus.begin(), consensus.end());
+    std::string reverse_consensus = consensus;
+    std::reverse(reverse_consensus.begin(), reverse_consensus.end());
+
+    uint8_t *reverse_cons = alloc_uint8_t(reverse_consensus);
+    uint8_t *reverse_seq = alloc_uint8_t(reverse_sequence);
+
+    int qlen = std::min(unit_size, left_boundary);
+    int left_ext = alignment::extend_left_boundary(reverse_seq, qlen,
+                                                   reverse_cons, consensus_len);
+    delete[] reverse_cons;
+    delete[] reverse_seq;
 
     // 向右拓展边界
     int right_ext = alignment::extend_right_boundary(
         s + std::min(len, right_boundary + unit_size),
         std::min(unit_size, len - right_boundary), cons, consensus_len);
-
-    std::cerr << "444" << std::endl;
     left_boundary -= left_ext;
     right_boundary += right_ext;
+    // tmp
+    left_boundary = std::max(0, left_boundary);
     double all_match = 0;
     double all_total = 0;
     for (int i = left_boundary; i < right_boundary; i += unit_size) {
       auto [match, total] = alignment::alignment(
           s + i, std::min(unit_size, right_boundary - i), cons, consensus_len);
-      std::cerr << "match = " << match << " " << "total = " << total
-                << std::endl;
       all_match += match;
       all_total += total;
     }
-    std::cout << "[" << left_boundary << "," << right_boundary << "]" << " "
-              << all_match / all_total << ' ' << consensus << std::endl;
+    ofs << "[" << left_boundary << "," << right_boundary << "]" << " "
+        << all_match / all_total << ' ' << consensus << std::endl;
     delete[] cons;
   }
 }

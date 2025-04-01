@@ -11,6 +11,7 @@
 #include "utils.h"
 
 int main(int argc, char *argv[]) {
+  std::ofstream ofs("result.txt", std::ios::app);
   Param opt{.lower_bound_size = 100,
             .gap_threshold = 4000,
             .overlap_threshold = 0.5,
@@ -24,6 +25,6 @@ int main(int argc, char *argv[]) {
     s += (char)(Read->Read[i] + '0');
   }
   printf("len = %d\n", Read->len);
-  solve(Read->Read, Read->len, opt);
+  solve(ofs, Read->Read, Read->len, opt);
   //  solve(s, opt);
 }
