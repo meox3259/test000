@@ -1,11 +1,7 @@
-#pragma once
-
+#include "handle_file.h"
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <vector>
-
-#include "handle_file.h"
 
 int char2int(char c) {
   if (c == 'A' || c == 'a') {
@@ -20,9 +16,7 @@ int char2int(char c) {
   if (c == 'C' || c == 'c') {
     return 3;
   }
-//  std::cerr << "char2int ERROR" << std::endl;
   return -1;
-//  std::exit(EXIT_FAILURE);
 }
 
 FILE *init_file(char *inputFile) {

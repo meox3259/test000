@@ -9,6 +9,9 @@ public:
   int gap_threshold;
   double overlap_threshold;
   double gap_ratio;
+
+  bool verbose;
+  std::string filename;
 };
 
 bool filter_by_seed(const std::string &s, int pos);

@@ -1,12 +1,13 @@
-#pragma once
-
 #include "sequence_handler.h"
 #include "ksw2/ksw2.h"
+#include "logger.h"
+#include "radix_sort.h"
 #include "sam.h"
 #include "spoa/include/spoa/spoa.hpp"
 #include "utils.h"
 
 #include <algorithm>
+#include <array>
 #include <assert.h>
 #include <cinttypes>
 #include <cmath>
@@ -29,76 +30,49 @@ const double error_rate = 0.01;
 const int lower_bound = 1000, upper_bound = 5000;
 const int gap_delta_threshold = 50;
 
-const int min_anchor_size = 5, max_anchor_size = 20;
+const int min_anchor_size = 3, max_anchor_size = 20;
 
 bool is_gap_valid(int gap) { return gap >= lower_bound && gap <= upper_bound; }
 
-bool check_gap_set_is_valid(const std::vector<int> &index) {
-  std::vector<int> gap_set;
-  for (int i = 0; i < static_cast<int>(index.size()) - 1; ++i) {
-    gap_set.push_back(index[i + 1] - index[i]);
-    //  std::cerr << index[i + 1] - index[i] << ' ';
+void collect_suspect_region(
+    std::vector<int> &index,
+    std::vector<std::pair<int, std::vector<int>>> &suspect_region) {
+  suspect_region.clear();
+  if (index.size() < min_anchor_size) {
+    return;
   }
-  // std::cerr << std::endl;
-  int len = gap_set.size();
-  if (len < 1) {
-    return false;
-  }
-  int avg = accumulate(gap_set.begin(), gap_set.end(), 0) / len;
-  if (!is_gap_valid(avg)) {
-    return false;
-  }
-  for (int gap : gap_set) {
-    if (!is_gap_valid(gap) || std::abs(gap - avg) > gap_delta_threshold) {
-      return false;
-    }
-  }
-  return true;
-}
-
-std::vector<std::pair<int, std::vector<int>>>
-collect_suspect_region(std::vector<int> &index) {
-  std::sort(index.begin(), index.end());
-  std::vector<std::pair<int, std::vector<int>>> suspect_region;
+  assert(std::is_sorted(index.begin(), index.end()));
   int len = index.size();
-  for (int i = 0; i < len; ++i) {
-    for (int j = std::min(max_anchor_size, len);
-         j >= min_anchor_size && i + j - 1 < index.size(); --j) {
-      std::vector<int> anchor_index;
-      for (int k = 0; k < j; ++k) {
-        anchor_index.push_back(index[i + k]);
-      }
-      if (check_gap_set_is_valid(anchor_index)) {
-        suspect_region.emplace_back((index[i + j] - index[i]) / (j - 1),
-                                    std::move(anchor_index));
-        break;
+  int sum_of_gap = 0;
+  int window_size = min_anchor_size;
+  std::vector<int> anchor_index;
+  for (int i = 0; i + min_anchor_size < len;) {
+    anchor_index.clear();
+    int anchor_size;
+    int sum_of_gap = 0;
+    int min_gap = INF;
+    int max_gap = -INF;
+    int avg_gap = INF;
+    for (anchor_size = 1; anchor_size <= max_anchor_size; ++anchor_size) {
+      int gap = index[i + anchor_size] - index[i + anchor_size - 1];
+      sum_of_gap += gap;
+      min_gap = std::min(min_gap, gap);
+      max_gap = std::max(max_gap, gap);
+      if (anchor_size > 1) {
+        avg_gap = sum_of_gap / (anchor_size - 1);
+        if (std::abs(avg_gap - min_gap) > gap_delta_threshold ||
+            std::abs(avg_gap - max_gap) > gap_delta_threshold) {
+          break;
+        }
       }
     }
-  }
-  return suspect_region;
-}
 
-std::vector<int> deal_with_gap_values(std::vector<int> &gap_values) {
-  std::sort(gap_values.begin(), gap_values.end());
-  int len = gap_values.size();
-  std::vector<int> partition_index{-1};
-  for (int i = 0; i < len - 1; ++i) {
-    if (gap_values[i + 1] - gap_values[i] > gap_delta_threshold) {
-      partition_index.push_back(i);
+    if (avg_gap >= lower_bound && avg_gap <= upper_bound) {
+      suspect_region.emplace_back(avg_gap, std::move(anchor_index));
     }
+
+    i += anchor_size - 1;
   }
-  partition_index.push_back(len);
-  std::vector<int> result;
-  int partition_index_size = partition_index.size();
-  for (int i = 0; i < partition_index_size - 1; ++i) {
-    int start = partition_index[i] + 1;
-    int end = partition_index[i + 1];
-    int avg =
-        accumulate(gap_values.begin() + start, gap_values.begin() + end, 0) /
-        (end - start);
-    result.push_back(avg);
-  }
-  return result;
 }
 
 } // namespace factor
@@ -267,28 +241,35 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
 
   std::vector<std::pair<int, std::vector<int>>> suspect_region;
   std::vector<int> gap_values;
+
+  std::vector<std::pair<int, std::vector<int>>> current_suspect_region;
   for (int i = 0; i < sam->size(); ++i) {
-    auto right_index_i = sam->get_right_index_by_node(i);
+    std::vector<int> right_index_i = sam->get_right_index_by_node(i);
     if (right_index_i.size() < factor::min_anchor_size) {
       continue;
     }
-    auto current_suspect_region = factor::collect_suspect_region(right_index_i);
+    factor::collect_suspect_region(right_index_i, current_suspect_region);
     for (const auto &[gap, anchor_index] : current_suspect_region) {
       suspect_region.emplace_back(gap, std::move(anchor_index));
       gap_values.push_back(gap);
     }
   }
 
+  LOG << "suspect_region.size() = " << suspect_region.size() << "\n";
+
   std::vector<std::vector<std::vector<int>>> bucket_of_index_partition(
       gap_values.size());
   std::vector<std::vector<int>> bucket_of_index(gap_values.size());
 
-  std::sort(
-      suspect_region.begin(), suspect_region.end(),
-      [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+  std::function<int(const std::pair<int, std::vector<int>> &)> get_index =
+      [](const std::pair<int, std::vector<int>> &item) -> int {
+    return item.first;
+  };
+
+  radix_sort(suspect_region, get_index, len);
 
   int suspect_region_size = suspect_region.size();
-  for (int i = 0; i < suspect_region_size; ++i) {
+  for (int i = 0; i < suspect_region_size; ++i) { // 可以尝试把log去掉
     const auto &[gap, anchor_index] = suspect_region[i];
     int gap_index =
         std::lower_bound(gap_values.begin(), gap_values.end(), gap) -
@@ -311,9 +292,10 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     }
   }
 
-  for (auto &vec : bucket_of_index) {
-    std::sort(vec.begin(), vec.end(),
-              [](const auto &lhs, const auto &rhs) { return lhs < rhs; });
+  for (auto &vec : bucket_of_index) { // 把排序改成基数排序？
+    assert(std::is_sorted(
+        vec.begin(), vec.end(),
+        [](const auto &lhs, const auto &rhs) { return lhs < rhs; }));
   }
 
   // 暂时不需要用，用于确定真正的区间大小
@@ -322,6 +304,7 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
               [](const auto &lhs, const auto &rhs) { return lhs[0] < rhs[0]; });
   }
 
+  LOG << "gap_values.size() = " << gap_values.size() << "\n";
   std::vector<std::pair<int, int>> raw_estimate_unit_region;
 
   // 排好序后，枚举每个端点求一个区间和
@@ -344,9 +327,12 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     }
   }
 
-  std::sort(
-      raw_estimate_unit_region.begin(), raw_estimate_unit_region.end(),
-      [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+  LOG << "raw_estimate_unit_region.size() = " << raw_estimate_unit_region.size()
+      << "\n";
+
+  radix_sort(
+      raw_estimate_unit_region,
+      [](const auto &item) -> int { return item.first; }, len);
 
   int max_r_boundary = -1;
   int max_l_boundary = -1;
@@ -371,12 +357,18 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     return false;
   };
 
+  LOG << "raw_estimate_unit_region.size() = " << raw_estimate_unit_region.size()
+      << "\n";
+
+  int cnt = 0;
+
   std::vector<std::tuple<int, int, int>> raw_estimate_interval;
   for (const auto &[start_position, unit_size] : raw_estimate_unit_region) {
     int end_position = start_position + unit_size;
     if (already_covered(start_position, end_position, unit_size)) {
       continue;
     }
+    cnt++;
     // 向左延伸
     int raw_left_boundary = start_position;
     int raw_right_boundary = end_position;
@@ -397,8 +389,6 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
         // 做一下alignment，如果相似度太小就break
         auto [match, length] = alignment::alignment(
             s + i, unit_size, s + i - unit_size, unit_size);
-        //  std::cerr << "match = " << match << " " << "length = " << length
-        //            << std::endl;
         if (1. - ((double)match / (double)(length)) <= factor::error_rate) {
           break;
         }
@@ -413,6 +403,10 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     raw_estimate_interval.emplace_back(unit_size, raw_left_boundary,
                                        raw_right_boundary);
   }
+
+  LOG << "cnt = " << cnt << "\n";
+  LOG << "raw_estimate_interval.size() = " << raw_estimate_interval.size()
+      << "\n";
 
   auto alignment_engine = spoa::AlignmentEngine::Create(
       spoa::AlignmentType::kNW, 3, -5, -3); // linear gaps
@@ -435,14 +429,17 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
       strings.emplace_back(std::move(sequence));
     }
 
+    LOG << "start spoa alignment" << "\n";
+
     for (auto &sequence : strings) {
       auto alignment = alignment_engine->Align(sequence, graph);
       graph.AddAlignment(alignment, sequence);
     }
 
+    LOG << "end spoa alignment" << "\n";
+
     auto consensus = graph.GenerateConsensus();
     int consensus_len = static_cast<int>(consensus.size());
-
     uint8_t *cons = alloc_uint8_t(consensus);
 
     // 向左拓展边界，这里需要把序列倒过来然后匹配
@@ -461,6 +458,8 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     int qlen = std::min(unit_size, left_boundary);
     int left_ext = alignment::extend_left_boundary(reverse_seq, qlen,
                                                    reverse_cons, consensus_len);
+    std::cerr << "pos5" << std::endl;
+
     delete[] reverse_cons;
     delete[] reverse_seq;
 
@@ -472,6 +471,8 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     right_boundary += right_ext;
     // tmp
     left_boundary = std::max(0, left_boundary);
+    std::cerr << "pos6" << std::endl;
+
     double all_match = 0;
     double all_total = 0;
     for (int i = left_boundary; i < right_boundary; i += unit_size) {
