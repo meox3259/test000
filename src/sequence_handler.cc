@@ -27,6 +27,7 @@ int8_t mat[25] = {1,  -2, -2, -2, 0,  -2, 1, -2, -2, 0, -2, -2, 1,
 namespace factor {
 
 const double error_rate = 0.01;
+const double kmer_rate = 0.5;
 const int lower_bound = 1000, upper_bound = 5000;
 const int gap_delta_threshold = 50;
 const int min_anchor_size = 3, max_anchor_size = 20;
@@ -353,7 +354,7 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
       // error_rate -> error model?
       // here calculate chains that fall in this interval[p, p + unit_size]
       // smarter algorithm
-      if (num_of_index >= (int)(unit_size * factor::error_rate)) {
+      if (num_of_index >= (int)(unit_size * factor::kmer_rate)) {
         raw_estimate_unit_region.emplace_back(start_position, unit_size);
       }
     }
