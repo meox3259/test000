@@ -1,5 +1,6 @@
 #include <cmath>
 #include <fstream>
+#include <getopt.h>
 #include <iostream>
 #include <unistd.h>
 
@@ -11,33 +12,39 @@
 bool LogStream::verbose = false;
 
 int main(int argc, char *argv[]) {
-  std::ofstream ofs("result.txt", std::ios::app);
+  static struct option long_options[] = {
+      {"file", required_argument, 0, 'f'},   {"verbose", no_argument, 0, 'v'},
+      {"number", required_argument, 0, 'n'}, {"help", no_argument, 0, 'h'},
+      {"result", required_argument, 0, 'r'}, {0, 0, 0, 0}};
+
   int opt;
-  Param option{.lower_bound_size = 100,
-               .gap_threshold = 4000,
-               .overlap_threshold = 0.5,
-               .gap_ratio = 0.8,
-               .verbose = false};
-  while ((opt = getopt(argc, argv, "vf:")) != -1) {
+  Param param{.lower_bound_size = 100,
+              .gap_threshold = 4000,
+              .overlap_threshold = 0.5,
+              .gap_ratio = 0.8,
+              .verbose = false};
+  while ((opt = getopt(argc, argv, "vf:r:")) != -1) {
     switch (opt) {
     case 'v':
-      option.verbose = true;
+      param.verbose = true;
       LogStream::verbose = true;
       break;
     case 'f':
-      option.filename = optarg;
+      param.input_filename = optarg;
+      break;
+    case 'r':
+      param.result_filename = optarg;
       break;
     }
   }
-  char *filename = argv[1];
-  printf("name = %s\n", filename);
-  FILE *fp = init_file(filename);
+
+  std::ofstream ofs(param.result_filename);
+  LOG << "input_filename = " << param.input_filename;
+
+  FILE *fp = init_file(param.input_filename);
   Read *Read = return_read(fp);
-  std::string s = "";
-  for (int i = 0; i < Read->len; ++i) {
-    s += (char)(Read->Read[i] + '0');
-  }
-  printf("len = %d\n", Read->len);
-  solve(ofs, Read->Read, Read->len, option);
+  LOG << "len = " << Read->len;
+
+  solve(ofs, Read->Read, Read->len, param);
   delete Read;
 }

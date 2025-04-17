@@ -29,8 +29,8 @@ namespace factor {
 const double error_rate = 0.01;
 const int lower_bound = 1000, upper_bound = 5000;
 const int gap_delta_threshold = 50;
-
 const int min_anchor_size = 3, max_anchor_size = 20;
+const int kmer_size = 30;
 
 bool is_gap_valid(int gap) { return gap >= lower_bound && gap <= upper_bound; }
 
@@ -254,7 +254,7 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
 
   LOG << "Start to build suspect region";
   for (int i = 0; i < len - 1; ++i) {
-    if (lcp_array[i] < factor::lower_bound) {
+    if (lcp_array[i] < factor::kmer_size) {
       if (right_index.size() <= factor::min_anchor_size) {
         continue;
       }
@@ -334,7 +334,7 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
   //             });
   // }
 
-  LOG << "gap_values.size() = " << gap_values.size() << "\n";
+  LOG << "gap_values.size() = " << gap_values.size();
   std::vector<std::pair<int, int>> raw_estimate_unit_region;
 
   // 排好序后，枚举每个端点求一个区间和
@@ -359,8 +359,8 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     }
   }
 
-  LOG << "raw_estimate_unit_region.size() = " << raw_estimate_unit_region.size()
-      << "\n";
+  LOG << "raw_estimate_unit_region.size() = "
+      << raw_estimate_unit_region.size();
 
   radix_sort(
       raw_estimate_unit_region,
@@ -389,8 +389,8 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     return false;
   };
 
-  LOG << "raw_estimate_unit_region.size() = " << raw_estimate_unit_region.size()
-      << "\n";
+  LOG << "raw_estimate_unit_region.size() = "
+      << raw_estimate_unit_region.size();
 
   int cnt = 0;
 
@@ -436,9 +436,8 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
                                        raw_right_boundary);
   }
 
-  LOG << "cnt = " << cnt << "\n";
-  LOG << "raw_estimate_interval.size() = " << raw_estimate_interval.size()
-      << "\n";
+  LOG << "cnt = " << cnt;
+  LOG << "raw_estimate_interval.size() = " << raw_estimate_interval.size();
 
   auto alignment_engine = spoa::AlignmentEngine::Create(
       spoa::AlignmentType::kNW, 3, -5, -3); // linear gaps
@@ -461,14 +460,14 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
       strings.emplace_back(std::move(sequence));
     }
 
-    LOG << "start spoa alignment" << "\n";
+    LOG << "start spoa alignment";
 
     for (auto &sequence : strings) {
       auto alignment = alignment_engine->Align(sequence, graph);
       graph.AddAlignment(alignment, sequence);
     }
 
-    LOG << "end spoa alignment" << "\n";
+    LOG << "end spoa alignment";
 
     auto consensus = graph.GenerateConsensus();
     int consensus_len = static_cast<int>(consensus.size());
@@ -490,7 +489,6 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     int qlen = std::min(unit_size, left_boundary);
     int left_ext = alignment::extend_left_boundary(reverse_seq, qlen,
                                                    reverse_cons, consensus_len);
-    std::cerr << "pos5" << std::endl;
 
     delete[] reverse_cons;
     delete[] reverse_seq;

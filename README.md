@@ -1,10 +1,10 @@
 Detect marcrosatellite test code
 
 ```bash
-mkdir build && cd build && cmake .. && make && cd ..
+rm -rf build && mkdir build && cd build && cmake .. && make && cd ..
 ```
 
 run
 ```bash
-./build/bin/suffix data/test2.fa
+./build/bin/suffix -v -f data/test2.fa -r result.txt
 ```

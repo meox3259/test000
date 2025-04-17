@@ -11,7 +11,8 @@ public:
   double gap_ratio;
 
   bool verbose;
-  std::string filename;
+  char *input_filename;
+  char *result_filename;
 };
 
 bool filter_by_seed(const std::string &s, int pos);

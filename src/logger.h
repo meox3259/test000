@@ -23,7 +23,11 @@ public:
     stream_ << "[" << std::put_time(&tm_buf, "%Y-%m-%d %H:%M:%S") << "] ";
   }
 
-  ~LogStream() { std::cout << stream_.str() << std::endl; }
+  ~LogStream() {
+    if (verbose) {
+      std::cout << stream_.str() << std::endl;
+    }
+  }
 
   template <typename T> LogStream &operator<<(const T &value) {
     stream_ << value;
