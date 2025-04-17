@@ -1,9 +1,14 @@
+#pragma once
+
+#include <cassert>
 #include <functional>
 #include <vector>
 
-template <typename T>
-void radix_sort(std::vector<T> &arr,
-                const std::function<int(const T &)> &get_index, int max_digit) {
+#include "logger.h"
+
+template <typename T, typename F>
+void radix_sort(std::vector<T> &arr, F &&get_index, int max_digit) {
+  LOG << "max_digit = " << max_digit << " " << "arr.size() = " << arr.size();
   std::vector<int> cnt(max_digit + 1, 0);
   for (const auto &item : arr) {
     cnt[get_index(item)]++;
@@ -16,10 +21,8 @@ void radix_sort(std::vector<T> &arr,
     output[--cnt[get_index(item)]] = std::move(item);
   }
   std::swap(arr, output);
-  assert(std::is_sorted(arr.begin(), arr.end()));
-}
-
-template <typename T, typename F>
-void radix_sort(std::vector<T> &arr, F &&get_index, int max_digit) {
-  radix_sort<T>(arr, std::forward<F>(get_index), max_digit);
+  assert(std::is_sorted(arr.begin(), arr.end(),
+                        [&get_index](const T &a, const T &b) {
+                          return get_index(a) < get_index(b);
+                        }));
 }
