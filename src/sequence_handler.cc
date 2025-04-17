@@ -234,9 +234,9 @@ int extend_right_boundary(uint8_t *query, int qlen, uint8_t *target, int tlen) {
 } // namespace alignment
 
 void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
-  std::string sequence("");
+  std::vector<int> sequence;
   for (int i = 0; i < len; ++i) {
-    sequence += safeNumberToDnaChar(s[i]);
+    sequence.push_back(s[i]);
   }
 
   LOG << "Start to build suffix array: size = " << sequence.size();
