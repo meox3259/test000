@@ -1,4 +1,5 @@
 #include "sequence_handler.h"
+#include "edlib_align.h"
 #include "ksw2/ksw2.h"
 #include "logger.h"
 #include "radix_sort.h"
@@ -28,6 +29,7 @@ namespace factor {
 
 const double error_rate = 0.01;
 const double kmer_rate = 0.5;
+const double alignment_error_rate = 0.05;
 const int lower_bound = 1000, upper_bound = 5000;
 const int gap_delta_threshold = 50;
 const int min_anchor_size = 3, max_anchor_size = 20;
@@ -395,6 +397,11 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
 
   int cnt = 0;
 
+  char *query = new char[len];
+  for (int i = 0; i < len; ++i) {
+    query[i] = safeNumberToDnaChar(s[i]);
+  }
+
   std::vector<std::tuple<int, int, int>> raw_estimate_interval;
   for (const auto &[start_position, unit_size] : raw_estimate_unit_region) {
     int end_position = start_position + unit_size;
@@ -405,27 +412,38 @@ void solve(std::ofstream &ofs, uint8_t *s, int len, const Param &opt) {
     // 向左延伸
     int raw_left_boundary = start_position;
     int raw_right_boundary = end_position;
+    std::vector<pair<int, int>> anchors;
     {
-      for (int i = start_position; i >= unit_size; i -= unit_size) {
+      for (int i = start_position; i >= unit_size;) {
         // 做一下alignment，如果相似度太小就break
-        auto [match, length] = alignment::alignment(
-            s + i - unit_size, unit_size, s + i, unit_size);
-        if (1. - ((double)(match) / (double)(length)) <= factor::error_rate) {
+        int start, end;
+        int edit_distance =
+            edlib_align_HW(query + start_position, unit_size,
+                           query + i - unit_size * 2, 2 * unit_size, &start,
+                           &end, unit_size * factor::alignment_error_rate);
+        if (edit_distance > unit_size * factor::alignment_error_rate) {
           break;
         }
-        raw_left_boundary = i - unit_size;
+        anchors.emplace_back(start, end);
+        i = i - unit_size * 2 + start;
+        raw_left_boundary = i;
       }
     }
+    std::reverse(anchors.begin(), anchors.end());
     // 向右延伸
     {
-      for (int i = end_position; i + unit_size <= len; i += unit_size) {
+      for (int i = end_position; i + unit_size <= len;) {
         // 做一下alignment，如果相似度太小就break
-        auto [match, length] = alignment::alignment(
-            s + i, unit_size, s + i - unit_size, unit_size);
-        if (1. - ((double)match / (double)(length)) <= factor::error_rate) {
+        int start, end;
+        int edit_distance = edlib_align_HW(
+            query + start_position, unit_size, query + i, 2 * unit_size, &start,
+            &end, unit_size * factor::alignment_error_rate);
+        if (edit_distance >= unit_size * factor::alignment_error_rate) {
           break;
         }
-        raw_right_boundary = i + unit_size;
+        anchors.emplace_back(start, end);
+        i = i + end;
+        raw_right_boundary = i;
       }
     }
     if (max_covered_region.find(start_position) == max_covered_region.end() ||

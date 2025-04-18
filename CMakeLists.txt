@@ -16,6 +16,8 @@ file(GLOB SRC_FILES
   "${PROJECT_SOURCE_DIR}/src/*.hpp"
   "${PROJECT_SOURCE_DIR}/src/ksw2/*.c"
   "${PROJECT_SOURCE_DIR}/src/ksw2/*.h"
+  "${PROJECT_SOURCE_DIR}/src/edlib/include/*.h"
+  "${PROJECT_SOURCE_DIR}/src/edlib/src/*.c"
 )
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/src/spoa")
