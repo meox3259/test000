@@ -65,7 +65,9 @@ Read *return_read(FILE *fp) {
         if (!char2int(s[i]) == -1) {
           continue;
         }
+
         CurrentRead->Read[cnt++] = char2int(s[i]);
+        CurrentRead->is_N[cnt - 1] = s[i] == 'N';
       }
     }
   }

@@ -51,3 +51,20 @@ uint8_t *alloc_uint8_t(const std::string &sequence) {
   uint8_t *data = new uint8_t[len];
   return data;
 }
+
+bool N_filter(const std::string &sequence) {
+  int N_count = 0;
+  for (char c : sequence) {
+    N_count += (c == 'N');
+  }
+  return N_count > 0.5 * sequence.size();
+}
+
+template <typename T>
+bool N_filter(T *sequence, int len) {
+  int N_count = 0;
+  for (int i = 0; i < len; ++i) {
+    N_count += (sequence[i] == 'N');
+  }
+  return N_count > 0.5 * len;
+}

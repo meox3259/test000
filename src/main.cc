@@ -8,8 +8,25 @@
 #include "logger.h"
 #include "sequence_handler.h"
 #include "utils.h"
+//#include "fasta_sequence.h"
 
 bool LogStream::verbose = false;
+
+/*
+using namespace mcf;
+
+void processOneFile(std::istream &input, std::ostream &output) {
+  bool isFirstSequence = true;
+  FastaSequence f;
+  while (input >> f) {
+  //  if (isFirstSequence && !options.isProtein &&
+  //      isDubiousDna(BEG(f.sequence), END(f.sequence)))
+  //    LOG << "tantan: that's some funny-lookin DNA\n";
+    solve(f, output);
+    isFirstSequence = false;
+  }
+}
+*/
 
 int main(int argc, char *argv[]) {
   static struct option long_options[] = {
@@ -42,9 +59,17 @@ int main(int argc, char *argv[]) {
   LOG << "input_filename = " << param.input_filename;
 
   FILE *fp = init_file(param.input_filename);
-  Read *Read = return_read(fp);
-  LOG << "len = " << Read->len;
-
-  solve(ofs, Read->Read, Read->len, param);
-  delete Read;
+  while (true) {
+    LOG << "start while";
+    Read *Read = return_read(fp);
+    LOG << "end return_read";
+    if (Read == nullptr) {
+      break;
+    }
+    LOG << "len = " << Read->len;
+    LOG << "Read->ID = " << Read->ID;
+    solve(ofs, Read->Read, Read->len, Read->is_N, param);
+    delete Read;
+    LOG << "end solve";
+  }
 }
