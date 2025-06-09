@@ -2,7 +2,12 @@
 
 #include <cstdint>
 #include <iostream>
+#include <vector>
+#include <sstream>
+#include <cstring>
 #include <sys/types.h>
+
+#include "logger.h"
 
 #define overlap_threshold 0.5
 
@@ -67,4 +72,24 @@ bool N_filter(T *sequence, int len) {
     N_count += (sequence[i] == 'N');
   }
   return N_count > 0.5 * len;
+}
+
+std::vector<std::string> split(const std::string& str, char delimiter) {
+    std::vector<std::string> result;
+    std::stringstream ss(str);
+    std::string item;
+    
+    while (std::getline(ss, item, delimiter)) {
+        LOG << "item = " << item;
+        result.push_back(item);
+    }
+    
+    return result;
+}
+
+bool check_substring(const char* text, const std::string& substring) {
+    if (text == nullptr || substring.empty()) {
+        return false;
+    }
+    return strstr(text, substring.c_str()) != nullptr;
 }

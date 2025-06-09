@@ -240,10 +240,13 @@ int extend_right_boundary(uint8_t *query, int qlen, uint8_t *target, int tlen) {
 int ksw2_global_with_cigar(const uint8_t *query, int qlen, const uint8_t *target, int tlen, int *n_cigar, uint32_t **cigar) {
     ksw_extz_t ez; memset(&ez, 0, sizeof(ksw_extz_t));
     int w=-1, zdrop=-1, end_bonus=0, flag = 0;
+    LOG << "ksw2_global_with_cigar start";
+    LOG << "qlen = " << qlen << ", tlen = " << tlen;
     ksw_extz2_sse(0, qlen, query, tlen, target, 5, mat, gap_open, gap_ext, w, zdrop, end_bonus, flag, &ez);
 #ifdef __DEBUG__
     print_cigar(ez.n_cigar, ez.cigar);
 #endif
+    LOG << "ksw2_global_with_cigar end";
     vector<int> xid = ksw2_get_xid(ez.cigar, ez.n_cigar, query, target);
     int iden_n = 0;
     if (!xid.empty()) {
@@ -286,28 +289,28 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
 
   // 这里可以进行整体的基数排序 - M
   // 目前改进的方法为，每个k-mer匹配向后5个的所有k-mer，作为gap
+  int id = 0;
+  std::vector<std::pair<int, int>> right_index_pair;
   for (int i = 0; i < len - 1; ++i) {
     if (lcp_array[i] < factor::kmer_size) {
       if (right_index.size() <= factor::min_anchor_size) {
         continue;
       }
-      std::sort(right_index.begin(), right_index.end());
-      int start_position = right_index[0];
-      int end_position = right_index.back();
+      // 这里非常慢
+      //  int start_position = *min_element(right_index.begin(),
+      //  right_index.end()); int end_position =
+      //  *max_element(right_index.begin(), right_index.end());
+      int start_position = 0;
+      int end_position = 0;
       int N_count = prefix_sum_N[end_position] - prefix_sum_N[start_position];
-      if (N_count > /*factor::N_threshold * (end_position - start_position + 1)*/ 100) {
+      if (N_count >
+          /*factor::N_threshold * (end_position - start_position + 1)*/ 100) {
         continue;
-      } 
-  //    LOG << "right_index.size() = " << right_index.size();
-      for (int j = 0; j < right_index.size(); ++j) {
-        for (int k = 1;  k <= 5 && j + k < right_index.size(); ++k) {
-          int gap = right_index[j + k] - right_index[j];
-          if (gap >= factor::lower_bound && gap <= factor::upper_bound) {
-            gap_values.push_back(gap);
-            gaps.emplace_back(gap, right_index[j]);
-          }
-        }
       }
+      for (int j : right_index) {
+        right_index_pair.emplace_back(j, id);
+      }
+      id++;
       right_index.clear();
     }
     right_index.push_back(suffix_array[i + 1]);
@@ -317,14 +320,80 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     int start_position = right_index[0];
     int end_position = right_index.back();
     int N_count = prefix_sum_N[end_position + 1] - prefix_sum_N[start_position];
+    if (!(N_count >
+          factor::N_threshold * (end_position - start_position + 1))) {
+      for (int j : right_index) {
+        right_index_pair.emplace_back(j, id);
+      }
+      id++;
+    }
+  }
+  LOG << "first id = " << id;
+  radix_sort(
+      right_index_pair, [](const auto &item) -> int { return item.first; },
+      len);
+  LOG << "out of radix sort";
+  std::vector<std::vector<int>> right_index_2d(id);
+  for (const auto &[index, id] : right_index_pair) {
+    right_index_2d[id].push_back(index);
+  }
+
+  LOG << "right_index_2d.size() = " << right_index_2d.size();
+
+  right_index = {suffix_array[0]};
+  id = 0;
+  int start_position = suffix_array[0];
+  int end_position = suffix_array[0];
+  for (int i = 0; i < len - 1; ++i) {
+    if (lcp_array[i] < factor::kmer_size) {
+      if (right_index.size() <= factor::min_anchor_size) {
+        continue;
+      }
+      // 这里非常慢
+      assert(start_position <= end_position);
+      int N_count = prefix_sum_N[end_position] - prefix_sum_N[start_position];
+      if (N_count > /*factor::N_threshold * (end_position - start_position + 1)*/ 100) {
+        right_index.clear();
+        start_position = len - 1;
+        end_position = 0;
+        continue;
+      }
+      const auto &sorted_right_index = right_index_2d[id];
+      //   LOG << "sorted_right_index.size() = " << sorted_right_index.size();
+      for (int j = 0; j < sorted_right_index.size(); ++j) {
+        for (int k = 1; k <= 5 && j + k < sorted_right_index.size(); ++k) {
+          int gap = sorted_right_index[j + k] - sorted_right_index[j];
+          if (gap >= factor::lower_bound && gap <= factor::upper_bound) {
+            gap_values.push_back(gap);
+            gaps.emplace_back(gap, sorted_right_index[j]);
+          }
+        }
+      }
+      id++;
+      right_index.clear();
+      start_position = len - 1;
+      end_position = 0;
+    }
+    right_index.push_back(suffix_array[i + 1]);
+    start_position = min(start_position, suffix_array[i + 1]);
+    end_position = max(end_position, suffix_array[i + 1]);
+  }
+  LOG << "second id = " << id;
+  if (right_index.size() > factor::min_anchor_size) {
+    int start_position = *min_element(right_index.begin(), right_index.end());
+    int end_position = *max_element(right_index.begin(), right_index.end());
+    int N_count = prefix_sum_N[end_position + 1] - prefix_sum_N[start_position];
     if (!(N_count > factor::N_threshold * (end_position - start_position + 1))) {
-      std::sort(right_index.begin(), right_index.end());
-      for (int j = 0; j < right_index.size(); ++j) {
-        for (int k = 1;  k <= 5 && j + k < right_index.size(); ++k) {
-          int gap = right_index[j + k] - right_index[j];
+      auto sorted_right_index = right_index_2d[id];
+      assert(is_sorted(
+          sorted_right_index.begin(), sorted_right_index.end(),
+          [](const auto &a, const auto &b) -> bool { return a < b; }));
+      for (int j = 0; j < sorted_right_index.size(); ++j) {
+        for (int k = 1; k <= 5 && j + k < sorted_right_index.size(); ++k) {
+          int gap = sorted_right_index[j + k] - sorted_right_index[j];
           if (gap >= factor::min_anchor_size && gap <= factor::max_anchor_size) {
             gap_values.push_back(gap);
-            gaps.emplace_back(gap, right_index[j]);
+            gaps.emplace_back(gap, sorted_right_index[j]);
           }
         }
       }
@@ -398,6 +467,8 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
       raw_estimate_unit_region,
       [](const auto &item) -> int { return std::get<1>(item); }, len);
 
+  LOG << "radix_sort done";
+
   int max_r_boundary = -1;
   int max_l_boundary = -1;
 
@@ -405,10 +476,12 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
 
   // 树状数组
   MaxFenwickTree ft(len);
-  auto already_covered = [&max_l_boundary, &max_r_boundary, &ft](int start_position,
-                                                            int end_position,
-                                                            int unit_size) {
-    int l_max = ft.queryPrefixMax(start_position);
+  auto already_covered = [&max_l_boundary, &max_r_boundary, &ft,
+                          &len](int start_position, int end_position,
+                                int unit_size) {
+    int l_max = ft.queryPrefixMax(min(start_position + unit_size, len));
+    LOG << "l_max = " << l_max << ", start_position = " << start_position
+        << ", end_position = " << end_position << ", unit_size = " << unit_size;
     return l_max >= end_position;
   };
 
@@ -427,7 +500,8 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     if (already_covered(start_position, end_position, unit_size)) {
       continue;
     }
-
+    LOG << "try_to_extend: start_position = " << start_position
+        << ", unit_size = " << unit_size << ", index = " << index;
     cnt++;
     // bucket是一个vector，存储了gap=gap_index[index]的所有下标
     const auto &bucket = bucket_of_index[index];
@@ -446,15 +520,25 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
       if (iter == bucket.end()) {
         break;
       }
+      LOG << "E = " << E;
       if (iter == bucket.begin()) {
         LOG << "Error: iter == bucket.begin()";
         break;
       }
       auto iter_prev = prev(iter);
+      LOG << "000";
       int s1 = iter_prev->first;
+      LOG << "111";
       int e1 = s1 + iter_prev->second;
+      LOG << "222";
       int s2 = iter->first;
+      LOG << "333";
       int e2 = s2 + iter->second;
+      LOG << "444";
+      LOG << "qstart = " << e1 - factor::kmer_size + 1 << ' '
+          << "qlen = " << e2 - e1 + factor::kmer_size << ' '
+          << "tstart = " << s1 - factor::kmer_size + 1 << ' '
+          << "tlen = " << s2 - s1 + factor::kmer_size << "len = " << len;
       int iden_n = alignment::ksw2_global_with_cigar(seq + e1 - factor::kmer_size + 1, e2 - e1 + factor::kmer_size,
               seq + s1 - factor::kmer_size + 1, s2 - s1 + factor::kmer_size,
               &n_cigar, &cigar);
@@ -504,7 +588,8 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
       }
     }
     raw_left_boundary = S;
-
+    LOG << "raw_left_boundary = " << raw_left_boundary
+        << ", raw_right_boundary = " << raw_right_boundary;
     anchors.push_back(raw_left_boundary);
     anchors.push_back(raw_right_boundary);
     sort(anchors.begin(), anchors.end());
@@ -538,6 +623,7 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     int anchor_size = static_cast<int>(anchors.size());
     
     std::vector<std::string> sequences;
+    // 1804 5099 8429 11753 15077 18408 21777 25101 28432
     for (int i = 0; i < anchor_size - 1; ++i) {
       std::string cur_seq = "";
       for (int j = anchors[i]; j < anchors[i + 1]; ++j) {
@@ -559,11 +645,6 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     int consensus_len = static_cast<int>(consensus.size());
     uint8_t *cons = alloc_uint8_t(consensus);
 
-    for (const auto &sequence : sequences) {
-      LOG << "len(sequence) = " << sequence.size();
-      ofs << ">" << sequence << std::endl;
-    }
-
     double all_match = 0;
     double all_total = 0;
     uint8_t *seq0 = alloc_uint8_t(sequences[0]);
@@ -583,5 +664,10 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
 
     ofs << "[" << left_boundary << "," << right_boundary << "]" << " " << unit_size << " "
         << all_match / all_total << ' ' << consensus << std::endl;
+
+    for (int i = 0; i < anchors.size(); ++i) {
+      ofs << anchors[i] << ' ';
+    }
+    ofs << endl;
   }
 }

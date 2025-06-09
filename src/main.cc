@@ -12,22 +12,6 @@
 
 bool LogStream::verbose = false;
 
-/*
-using namespace mcf;
-
-void processOneFile(std::istream &input, std::ostream &output) {
-  bool isFirstSequence = true;
-  FastaSequence f;
-  while (input >> f) {
-  //  if (isFirstSequence && !options.isProtein &&
-  //      isDubiousDna(BEG(f.sequence), END(f.sequence)))
-  //    LOG << "tantan: that's some funny-lookin DNA\n";
-    solve(f, output);
-    isFirstSequence = false;
-  }
-}
-*/
-
 int main(int argc, char *argv[]) {
   static struct option long_options[] = {
       {"file", required_argument, 0, 'f'},   {"verbose", no_argument, 0, 'v'},
