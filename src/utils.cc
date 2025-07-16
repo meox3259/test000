@@ -26,7 +26,6 @@ const char *seeds[] = {
 const int seed_size = 32;
 
 bool filter_by_seed(const std::string &s, int pos) {
-  std::cerr << "s = " << s << std::endl;
   for (int i = 0; i < seed_size; ++i) {
     bool match = true;
     for (int j = 0; j < 12; ++j) {
@@ -54,6 +53,9 @@ char safeNumberToDnaChar(int num, char default_char) {
 uint8_t *alloc_uint8_t(const std::string &sequence) {
   int len = static_cast<int>(sequence.size());
   uint8_t *data = new uint8_t[len];
+  for (int i = 0; i < len; ++i) {
+    data[i] = static_cast<uint8_t>(sequence[i]);
+  }
   return data;
 }
 
@@ -78,12 +80,11 @@ std::vector<std::string> split(const std::string& str, char delimiter) {
     std::vector<std::string> result;
     std::stringstream ss(str);
     std::string item;
-    
+
     while (std::getline(ss, item, delimiter)) {
-        LOG << "item = " << item;
-        result.push_back(item);
+      result.push_back(item);
     }
-    
+
     return result;
 }
 

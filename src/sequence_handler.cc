@@ -1,12 +1,12 @@
 #include "sequence_handler.h"
 #include "edlib_align.h"
+#include "fenwick_tree.h"
 #include "ksw2/ksw2.h"
 #include "logger.h"
 #include "radix_sort.h"
 #include "spoa/include/spoa/spoa.hpp"
 #include "suffix_array.h"
 #include "utils.h"
-#include "fenwick_tree.h"
 
 #include <algorithm>
 #include <array>
@@ -26,7 +26,14 @@ int match = 1, mis = 2, gap_open = 2, gap_ext = 1;
 int8_t mat[25] = {1,  -2, -2, -2, 0,  -2, 1, -2, -2, 0, -2, -2, 1,
                   -2, 0,  -2, -2, -2, 1,  0, 0,  0,  0, 0,  0};
 
-int prime_number[] = {-100000000, 1009, 1061, 1109, 1163, 1213, 1277, 1327, 1381, 1429, 1481, 1531, 1579, 1627, 1693, 1741, 1789, 1847, 1901, 1949, 1997, 2053, 2111, 2161, 2213, 2267, 2333, 2381, 2437, 2503, 2551, 2609, 2657, 2707, 2767, 2819, 2879, 2927, 2999, 3049, 3109, 3163, 3217, 3271, 3319, 3371, 3433, 3491, 3539, 3593, 3643, 3691, 3739, 3793, 3847, 3907, 3967, +1000000};
+int prime_number[] = {
+    -100000000, 1009, 1061, 1109, 1163, 1213, 1277, 1327, 1381,    1429, 1481,
+    1531,       1579, 1627, 1693, 1741, 1789, 1847, 1901, 1949,    1997, 2053,
+    2111,       2161, 2213, 2267, 2333, 2381, 2437, 2503, 2551,    2609, 2657,
+    2707,       2767, 2819, 2879, 2927, 2999, 3049, 3109, 3163,    3217, 3271,
+    3319,       3371, 3433, 3491, 3539, 3593, 3643, 3691, 3739,    3793, 3847,
+    3907,       3967, 4000, 4050, 4100, 4150, 4200, 4350, 4300,    4350, 4400,
+    4450,       4500, 4550, 4600, 4650, 4700, 4750, 4800, +1000000};
 
 namespace factor {
 
@@ -130,6 +137,10 @@ std::pair<int, int> alignment(uint8_t *query, int qlen, uint8_t *target,
 
   ksw_extz2_sse(0, qlen, query, tlen, target, 5, mat, gap_open, gap_ext, w,
                 zdrop, end_bonus, flag, &ez);
+  for (int i = 0; i < ez.n_cigar; ++i) // print CIGAR
+    printf("%d%c", ez.cigar[i] >> 4, "MID"[ez.cigar[i] & 0xf]);
+  putchar('\n');
+  fflush(stdout);
   std::vector<int> xid = ksw2_get_xid(ez.cigar, ez.n_cigar, query, target);
   return {xid[0], accumulate(xid.begin(), xid.end(), 0)};
 }
@@ -361,7 +372,7 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
       const auto &sorted_right_index = right_index_2d[id];
       //   LOG << "sorted_right_index.size() = " << sorted_right_index.size();
       for (int j = 0; j < sorted_right_index.size(); ++j) {
-        for (int k = 1; k <= 5 && j + k < sorted_right_index.size(); ++k) {
+        for (int k = 1; k <= 10 && j + k < sorted_right_index.size(); ++k) {
           int gap = sorted_right_index[j + k] - sorted_right_index[j];
           if (gap >= factor::lower_bound && gap <= factor::upper_bound) {
             gap_values.push_back(gap);
@@ -378,7 +389,7 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     start_position = min(start_position, suffix_array[i + 1]);
     end_position = max(end_position, suffix_array[i + 1]);
   }
-  LOG << "second id = " << id;
+
   if (right_index.size() > factor::min_anchor_size) {
     int start_position = *min_element(right_index.begin(), right_index.end());
     int end_position = *max_element(right_index.begin(), right_index.end());
@@ -389,9 +400,10 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
           sorted_right_index.begin(), sorted_right_index.end(),
           [](const auto &a, const auto &b) -> bool { return a < b; }));
       for (int j = 0; j < sorted_right_index.size(); ++j) {
-        for (int k = 1; k <= 5 && j + k < sorted_right_index.size(); ++k) {
+        for (int k = 1; k <= 10 && j + k < sorted_right_index.size(); ++k) {
           int gap = sorted_right_index[j + k] - sorted_right_index[j];
-          if (gap >= factor::min_anchor_size && gap <= factor::max_anchor_size) {
+          LOG << "gap = " << gap;
+          if (gap >= factor::lower_bound && gap <= factor::upper_bound) {
             gap_values.push_back(gap);
             gaps.emplace_back(gap, sorted_right_index[j]);
           }
@@ -419,7 +431,8 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     int start_position = gaps[i].second;
     int end_position = start_position + gaps[i].first;
     int gap = gaps[i].first;
-    int gap_index = std::lower_bound(prime_number, prime_number + 50, gap) - prime_number;
+    int gap_index =
+        std::lower_bound(prime_number, prime_number + 75, gap) - prime_number;
     int dis1 = std::abs(gap - prime_number[gap_index]);
     int dis2 = std::abs(gap - prime_number[gap_index - 1]);
     if (dis1 <= 50) {
@@ -454,6 +467,8 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
         num_of_index++;
       }
       if (num_of_index >= gap * factor::kmer_rate) {
+        LOG << "start_position = " << start_position << ", gap = " << gap
+            << ", num_of_index = " << num_of_index;
         raw_estimate_unit_region.emplace_back(start_position, gap, i);
       }
     }
@@ -526,29 +541,28 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
         break;
       }
       auto iter_prev = prev(iter);
-      LOG << "000";
+
       int s1 = iter_prev->first;
-      LOG << "111";
       int e1 = s1 + iter_prev->second;
-      LOG << "222";
       int s2 = iter->first;
-      LOG << "333";
       int e2 = s2 + iter->second;
-      LOG << "444";
-      LOG << "qstart = " << e1 - factor::kmer_size + 1 << ' '
-          << "qlen = " << e2 - e1 + factor::kmer_size << ' '
-          << "tstart = " << s1 - factor::kmer_size + 1 << ' '
-          << "tlen = " << s2 - s1 + factor::kmer_size << "len = " << len;
-      int iden_n = alignment::ksw2_global_with_cigar(seq + e1 - factor::kmer_size + 1, e2 - e1 + factor::kmer_size,
-              seq + s1 - factor::kmer_size + 1, s2 - s1 + factor::kmer_size,
-              &n_cigar, &cigar);
-      LOG << "iden_n = " << iden_n << ' ' << s2 - s1 + factor::kmer_size << ' ' << e2 - e1 + factor::kmer_size;
-      if (iden_n >= min(s2 - s1 + factor::kmer_size, e2 - e1 + factor::kmer_size) * 0.9) {
+      int qlen = e2 - e1 + factor::kmer_size;
+      int tlen = s2 - s1 + factor::kmer_size;
+      if (qlen > 10000 || tlen > 10000) {
+        break;
+      }
+      int iden_n = alignment::ksw2_global_with_cigar(
+          seq + e1 - factor::kmer_size + 1, qlen,
+          seq + s1 - factor::kmer_size + 1, tlen, &n_cigar, &cigar);
+      LOG << "iden_n = " << iden_n << ' ' << s2 - s1 + factor::kmer_size << ' '
+          << e2 - e1 + factor::kmer_size;
+      if (iden_n >=
+          min(s2 - s1 + factor::kmer_size, e2 - e1 + factor::kmer_size) * 0.9) {
         S = E;
         // 这里待修改
-        int bt = alignment::extend_right_boundary(seq + e1,  e2 - e1 + factor::kmer_size, seq + s1, s2 - s1 + factor::kmer_size);
-        LOG << "bt = " << bt;
-        E = e2 + alignment::extend_right_boundary(seq + e1,  e2 - e1 + factor::kmer_size, seq + s1, s2 - s1 + factor::kmer_size);
+        E = e2 + alignment::extend_right_boundary(
+                     seq + e1, e2 - e1 + factor::kmer_size, seq + s1,
+                     s2 - s1 + factor::kmer_size);
         anchors.push_back(S);
         LOG << "S = " << S << ' ' << "E = " << E;
       } else {
@@ -574,9 +588,14 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
       int e1 = s1 + iter_prev->second;
       int s2 = iter->first;
       int e2 = s2 + iter->second;
-      int iden_n = alignment::ksw2_global_with_cigar(seq + e1 - factor::kmer_size + 1, e2 - e1 + factor::kmer_size,
-              seq + s1 - factor::kmer_size + 1, s2 - s1 + factor::kmer_size,
-              &n_cigar, &cigar);
+      int tlen = s2 - s1 + factor::kmer_size;
+      int qlen = e2 - e1 + factor::kmer_size;
+      if (qlen > 10000 || tlen > 10000) {
+        break;
+      }
+      int iden_n = alignment::ksw2_global_with_cigar(
+          seq + e1 - factor::kmer_size + 1, qlen,
+          seq + s1 - factor::kmer_size + 1, tlen, &n_cigar, &cigar);
       if (iden_n >= min(s2 - s1 + factor::kmer_size, e2 - e1 + factor::kmer_size) * 0.9) {
         E = S;
         // 这里待修改
@@ -647,14 +666,18 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
 
     double all_match = 0;
     double all_total = 0;
-    uint8_t *seq0 = alloc_uint8_t(sequences[0]);
-    int seq0_len = static_cast<int>(sequences[0].size());
-    for (const auto &sequence : sequences) {
+    int tot_seq = sequences.size();
+    LOG << "tot_seq = " << tot_seq;
+    uint8_t *seq0 = alloc_uint8_t(sequences[tot_seq / 2]);
+    int seq0_len = static_cast<int>(sequences[tot_seq / 2].size());
+    for (int i = 0; i < tot_seq; ++i) {
+      auto &sequence = sequences[i];
       uint8_t *seq = alloc_uint8_t(sequence);
       int seq_len = static_cast<int>(sequence.size());
-      auto [match, total] = alignment::alignment(
-          seq, seq_len, seq0, seq0_len);
-      
+      auto [match, total] =
+          alignment::alignment(cons, consensus_len, seq, seq_len);
+      //  auto [match, total] =
+      //      alignment::alignment(cons, consensus_len, seq, seq_len);
       all_match += match;
       all_total += total;
       LOG << "match = " << match << ", total = " << total;
