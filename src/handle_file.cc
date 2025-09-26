@@ -71,10 +71,12 @@ Read *return_read(FILE *fp) {
       }
     }
   }
+  std::cerr << "222" << std::endl;
   if (!hasRead) {
     CurrentRead->len = 0;
     delete[] s;
-    delete[] ReadID;
+    std::cerr << "333" << std::endl;
+    //  delete[] ReadID;
     return CurrentRead;
   }
   int j;

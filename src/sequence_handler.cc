@@ -27,13 +27,14 @@ int8_t mat[25] = {1,  -2, -2, -2, 0,  -2, 1, -2, -2, 0, -2, -2, 1,
                   -2, 0,  -2, -2, -2, 1,  0, 0,  0,  0, 0,  0};
 
 int prime_number[] = {
-    -100000000, 1009, 1061, 1109, 1163, 1213, 1277, 1327, 1381,    1429, 1481,
-    1531,       1579, 1627, 1693, 1741, 1789, 1847, 1901, 1949,    1997, 2053,
-    2111,       2161, 2213, 2267, 2333, 2381, 2437, 2503, 2551,    2609, 2657,
-    2707,       2767, 2819, 2879, 2927, 2999, 3049, 3109, 3163,    3217, 3271,
-    3319,       3371, 3433, 3491, 3539, 3593, 3643, 3691, 3739,    3793, 3847,
-    3907,       3967, 4000, 4050, 4100, 4150, 4200, 4350, 4300,    4350, 4400,
-    4450,       4500, 4550, 4600, 4650, 4700, 4750, 4800, +1000000};
+    -100000000, 1009, 1061, 1109, 1163, 1213, 1277, 1327, 1381,    1429,
+    1481,       1531, 1579, 1627, 1693, 1741, 1789, 1847, 1901,    1949,
+    1997,       2053, 2111, 2161, 2213, 2267, 2333, 2381, 2437,    2503,
+    2551,       2609, 2657, 2707, 2767, 2819, 2879, 2927, 2999,    3049,
+    3109,       3163, 3217, 3271, 3319, 3371, 3433, 3491, 3539,    3593,
+    3643,       3691, 3739, 3793, 3847, 3907, 3967, 4000, 4050,    4100,
+    4150,       4200, 4350, 4300, 4350, 4400, 4450, 4500, 4550,    4600,
+    4650,       4700, 4750, 4800, 4850, 4900, 4950, 5000, +1000000};
 
 namespace factor {
 
@@ -402,7 +403,7 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
       for (int j = 0; j < sorted_right_index.size(); ++j) {
         for (int k = 1; k <= 10 && j + k < sorted_right_index.size(); ++k) {
           int gap = sorted_right_index[j + k] - sorted_right_index[j];
-          LOG << "gap = " << gap;
+          //   LOG << "gap = " << gap;
           if (gap >= factor::lower_bound && gap <= factor::upper_bound) {
             gap_values.push_back(gap);
             gaps.emplace_back(gap, sorted_right_index[j]);
@@ -432,7 +433,7 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
     int end_position = start_position + gaps[i].first;
     int gap = gaps[i].first;
     int gap_index =
-        std::lower_bound(prime_number, prime_number + 75, gap) - prime_number;
+        std::lower_bound(prime_number, prime_number + 78, gap) - prime_number;
     int dis1 = std::abs(gap - prime_number[gap_index]);
     int dis2 = std::abs(gap - prime_number[gap_index - 1]);
     if (dis1 <= 50) {
@@ -457,18 +458,19 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
   for (int i = 0; i < bucket_of_index.size(); ++i) {
     int len_of_bucket = bucket_of_index[i].size();
     int k = 0;
+    int num_of_index = 1;
     for (int j = 0; j < len_of_bucket; ++j) {
       int start_position = bucket_of_index[i][j].first;
       int end_position = start_position + bucket_of_index[i][j].second;
       int gap = bucket_of_index[i][j].second;
-      int num_of_index = 0;
+      num_of_index--;
       while (k < len_of_bucket && bucket_of_index[i][k].first < end_position) {
         k++;
         num_of_index++;
       }
       if (num_of_index >= gap * factor::kmer_rate) {
-        LOG << "start_position = " << start_position << ", gap = " << gap
-            << ", num_of_index = " << num_of_index;
+        //  LOG << "start_position = " << start_position << ", gap = " << gap
+        //      << ", num_of_index = " << num_of_index;
         raw_estimate_unit_region.emplace_back(start_position, gap, i);
       }
     }
@@ -495,8 +497,9 @@ void solve(std::ofstream &ofs, uint8_t *seq, int len, int *is_N, const Param &op
                           &len](int start_position, int end_position,
                                 int unit_size) {
     int l_max = ft.queryPrefixMax(min(start_position + unit_size, len));
-    LOG << "l_max = " << l_max << ", start_position = " << start_position
-        << ", end_position = " << end_position << ", unit_size = " << unit_size;
+    //  LOG << "l_max = " << l_max << ", start_position = " << start_position
+    //      << ", end_position = " << end_position << ", unit_size = " <<
+    //      unit_size;
     return l_max >= end_position;
   };
 
